@@ -1,48 +1,32 @@
-// server.js
 import express from "express";
 import fetch from "node-fetch";
-import cors from "cors";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Allow your frontend origin (for now, allow all with cors())
-app.use(cors());
-app.use(express.json());
-
-const GST_API_BASE = "https://einvoice1.gst.gov.in/others/GetGstinInfo?GSTIN=";
-
-// Simple health check
-app.get("/", (req, res) => {
-  res.send("GSTIN proxy backend is running ✅");
+// CORS Policy
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*"); // change "*" to your domain if needed
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  next();
 });
 
-// Proxy endpoint: /api/gstin/:gstin
-app.get("/api/gstin/:gstin", async (req, res) => {
-  const { gstin } = req.params;
+app.get("/gst", async (req, res) => {
+  const gstin = req.query.GSTIN;
 
   if (!gstin) {
-    return res.status(400).json({ error: "GSTIN is required" });
+    return res.status(400).json({ error: "GSTIN parameter missing" });
   }
+
+  const apiURL = `https://einvoice1.gst.gov.in/others/GetGstinInfo?GSTIN=${encodeURIComponent(gstin)}`;
 
   try {
-    const response = await fetch(GST_API_BASE + gstin);
-    if (!response.ok) {
-      return res
-        .status(response.status)
-        .json({ error: `Upstream error: ${response.status}` });
-    }
-
+    const response = await fetch(apiURL);
     const data = await response.json();
-    // Just relay the JSON from GST API
     res.json(data);
   } catch (err) {
-    console.error("Error calling GST API:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Failed to fetch GST Data", details: err.message });
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Server running on port ${port}`));
